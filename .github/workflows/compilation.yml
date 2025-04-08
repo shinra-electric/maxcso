@@ -30,10 +30,17 @@ jobs:
         with:
           name: maxcso-windows-nonpgo
           path: maxcso.exe
-
-  build-macos:
-    name: macOS build
-    runs-on: macos-latest
+          
+  build-macOS:
+    name: macOS ${{ matrix.suffix }} build
+    strategy:
+      matrix:
+        include:
+            - runner: macos-latest
+              suffix: arm64
+            - runner: macos-13
+              suffix: x86
+    runs-on: ${{ matrix.runner}}
 
     steps:
       - name: Checkout repository
@@ -41,14 +48,14 @@ jobs:
 
       - name: Build
         run: |
-          make -j2
-          tar cv maxcso | gzip -9 > maxcso-macos.tar.gz
+          make -j$(sysctl -n hw.ncpu)
+          tar cv maxcso | gzip -9 > maxcso-macos-${{ matrix.suffix }}.tar.gz
 
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
-          name: maxcso-macos
-          path: maxcso-macos.tar.gz
+          name: maxcso-macos-${{ matrix.suffix }}
+          path: maxcso-macos-${{ matrix.suffix }}.tar.gz
 
   build-ubuntu:
     name: Ubuntu build

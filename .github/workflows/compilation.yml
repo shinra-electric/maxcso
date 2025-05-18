@@ -30,32 +30,72 @@ jobs:
         with:
           name: maxcso-windows-nonpgo
           path: maxcso.exe
-          
+
   build-macOS:
-    name: macOS ${{ matrix.suffix }} build
+    name: macOS build
     strategy:
       matrix:
         include:
-            - runner: macos-latest
-              suffix: arm64
-            - runner: macos-13
-              suffix: x86
+          - runner: macos-latest
+            suffix: arm64
+          - runner: macos-13
+            suffix: x86
     runs-on: ${{ matrix.runner}}
-
+  
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+    
       - name: Build
         run: |
           make -j$(sysctl -n hw.ncpu)
-          tar cv maxcso | gzip -9 > maxcso-macos-${{ matrix.suffix }}.tar.gz
-
+          mkdir maxcso-${{ matrix.suffix }}
+          mv maxcso maxcso-${{ matrix.suffix }}/maxcso
+    
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
-          name: maxcso-macos-${{ matrix.suffix }}
-          path: maxcso-macos-${{ matrix.suffix }}.tar.gz
+          name: maxcso-macOS-${{ matrix.suffix }}
+          path: maxcso-${{ matrix.suffix }}/maxcso
+
+  make-macOS-univeral-binary:
+    name: macOS universal binary
+    needs: build-macOS
+    runs-on: macos-latest
+    
+    steps:
+      - name: download arm artifact
+        uses: actions/download-artifact@v4
+        with: 
+          name: maxcso-macOS-arm64
+          path: maxcso-arm64
+          
+      - name: download x86 artifact
+        uses: actions/download-artifact@v4
+        with:   
+          name: maxcso-macOS-x86
+          path: maxcso-x86
+  
+      - name: Create universal binary
+        run: |
+          mkdir bin
+          lipo -output bin/maxcso -create maxcso-arm64/maxcso maxcso-x86/maxcso
+          mv bin/maxcso maxcso
+          chmod +rxw maxcso
+          tar cv maxcso | gzip -9 > maxcso-macOS-Universal.tar.gz
+          
+      - name: Delete x86 and arm builds
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: |
+            maxcso-macOS-x86
+            maxcso-macOS-arm64
+      
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: maxcso-macOS-Universal
+          path: maxcso-macOS-Universal.tar.gz
 
   build-ubuntu:
     name: Ubuntu build
